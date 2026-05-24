@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QHBoxLayout,
-    QListWidget
+    QListWidget,
+    QLabel
 )
 
 
@@ -28,13 +29,59 @@ class ChatWindow(QWidget):
         self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
 
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                color: white;
+                font-size: 14px;
+            }
+
+            QTextEdit {
+                background-color: #2b2b2b;
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 5px;
+            }
+
+            QListWidget {
+                background-color: #2b2b2b;
+                border: 1px solid #444;
+                border-radius: 8px;
+            }
+
+            QLineEdit {
+                background-color: #2b2b2b;
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 6px;
+            }
+
+            QPushButton {
+                background-color: #4a90e2;
+                border: none;
+                border-radius: 8px;
+                padding: 8px;
+            }
+
+            QPushButton:hover {
+                background-color: #5aa0f2;
+            }
+        """)
+
         layout = QVBoxLayout()
         chat_layout = QHBoxLayout()
 
         self.chat_box = QTextEdit()
         self.chat_box.setReadOnly(True)
+        self.users_label = QLabel("Online Users")
+        user_layout = QVBoxLayout()
+
 
         self.user_list = QListWidget()
+        self.user_list.setMaximumWidth(200)
+        
+        user_layout.addWidget(self.users_label)
+        user_layout.addWidget(self.user_list)
 
         self.message_input = QLineEdit()
         self.message_input.setPlaceholderText(
@@ -43,7 +90,7 @@ class ChatWindow(QWidget):
         self.send_button = QPushButton("Send")
 
         chat_layout.addWidget(self.chat_box, 3)
-        chat_layout.addWidget(self.user_list, 1)
+        chat_layout.addLayout(user_layout, 1)
         layout.addLayout(chat_layout)
 
         input_layout = QHBoxLayout()
