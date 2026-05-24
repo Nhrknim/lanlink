@@ -24,6 +24,16 @@ def broadcast(message, sender=None):
                     del clients[client]
                 client.close()
 
+def send_user_list():
+    users = ",".join(clients.values())
+
+    message = f"USERS:{users}"
+
+    for client in list(clients.keys()):
+        try:
+            client.send(message.encode())
+        except:
+            pass
 
 def handle_client(client):
     username = clients[client]
@@ -53,6 +63,8 @@ def handle_client(client):
         del clients[client]
 
     broadcast(leave_message)
+    send_user_list()
+
 
     client.close()
 
@@ -75,6 +87,7 @@ try:
             print(join_message)
 
             broadcast(join_message)
+            send_user_list()
 
             thread = threading.Thread(
                 target=handle_client,

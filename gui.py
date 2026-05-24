@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QVBoxLayout,
-    QHBoxLayout
+    QHBoxLayout,
+    QListWidget
 )
 
 
@@ -28,20 +29,27 @@ class ChatWindow(QWidget):
         self.resize(800, 600)
 
         layout = QVBoxLayout()
+        chat_layout = QHBoxLayout()
 
         self.chat_box = QTextEdit()
         self.chat_box.setReadOnly(True)
 
+        self.user_list = QListWidget()
+
         self.message_input = QLineEdit()
-        self.message_input.setPlaceholderText("Enter message and press Enter...")
+        self.message_input.setPlaceholderText(
+            "Enter message and press Enter...")
 
         self.send_button = QPushButton("Send")
 
-        layout.addWidget(self.chat_box)
+        chat_layout.addWidget(self.chat_box, 3)
+        chat_layout.addWidget(self.user_list, 1)
+        layout.addLayout(chat_layout)
+
         input_layout = QHBoxLayout()
         input_layout.addWidget(self.message_input)
         input_layout.addWidget(self.send_button)
-        
+
         layout.addLayout(input_layout)
 
         self.setLayout(layout)
@@ -113,6 +121,14 @@ class ChatWindow(QWidget):
                 break
 
     def display_message(self, message):
+        if message.startswith("USERS:"):
+            users = message[6:].split(",")
+            self.user_list.clear()
+            for user in users:
+                if user:
+                    self.user_list.addItem(user)
+            return
+
         self.chat_box.append(message)
 
 
