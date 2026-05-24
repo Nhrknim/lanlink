@@ -7,6 +7,7 @@ PORT = 5555
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
 server.listen()
+server.settimeout(1)
 
 clients = {}  # {socket: username}
 
@@ -56,22 +57,26 @@ def handle_client(client):
     client.close()
 
 
-while True:
-    client_socket, client_address = server.accept()
+try:
+    while True:
+        try:
+            client_socket, client_address = server.accept()
 
-    username = client_socket.recv(1024).decode()
+            print(f"Connected: {client_address}")
 
-    clients[client_socket] = username
+            clients.append(client_socket)
 
-    print(f"{username} connected from {client_address}")
+            thread = threading.Thread(
+                target=handle_client,
+                args=(client_socket,)
+            )
+            thread.start()
 
-    join_message = f"*** {username} joined the chat ***"
+        except socket.timeout:
+            continue
 
-    broadcast(join_message)
+except KeyboardInterrupt:
+    print("\nServer shutting down...")
 
-    thread = threading.Thread(
-        target=handle_client,
-        args=(client_socket,)
-    )
-
-    thread.start()
+finally:
+    server.close()
