@@ -62,14 +62,25 @@ try:
         try:
             client_socket, client_address = server.accept()
 
-            print(f"Connected: {client_address}")
+            # Receive username from client
+            username = client_socket.recv(1024).decode()
 
-            clients.append(client_socket)
+            # Store socket -> username mapping
+            clients[client_socket] = username
+
+            print(f"{username} connected from {client_address}")
+
+            join_message = f"*** {username} joined the chat ***"
+
+            print(join_message)
+
+            broadcast(join_message)
 
             thread = threading.Thread(
                 target=handle_client,
                 args=(client_socket,)
             )
+
             thread.start()
 
         except socket.timeout:

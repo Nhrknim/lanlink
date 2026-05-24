@@ -18,75 +18,86 @@ class ChatWindow(QWidget):
 
     message_received = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, username, server_ip):
         super().__init__()
 
-        self.setWindowTitle("LANLink")
+        self.username = username
+        self.server_ip = server_ip
+
+        self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
 
-        self.main_layout = QVBoxLayout()
+        layout = QVBoxLayout()
 
         self.chat_box = QTextEdit()
         self.chat_box.setReadOnly(True)
 
         self.message_input = QLineEdit()
-        self.message_input.setPlaceholderText("Type a message...")
+        self.message_input.setPlaceholderText("Enter message and press Enter...")
 
         self.send_button = QPushButton("Send")
 
-        self.input_layout = QHBoxLayout()
+        layout.addWidget(self.chat_box)
+        input_layout = QHBoxLayout()
+        input_layout.addWidget(self.message_input)
+        input_layout.addWidget(self.send_button)
+        
+        layout.addLayout(input_layout)
 
-        self.input_layout.addWidget(self.message_input)
-        self.input_layout.addWidget(self.send_button)
+        self.setLayout(layout)
 
-        self.main_layout.addWidget(self.chat_box)
-        self.main_layout.addLayout(self.input_layout)
-
-        self.setLayout(self.main_layout)
-
-        # Button connections
         self.send_button.clicked.connect(self.send_message)
         self.message_input.returnPressed.connect(self.send_message)
 
-        # Signal connection
         self.message_received.connect(self.display_message)
 
-        # Networking
-        self.username = "GUI_User"
+        try:
+            self.client = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
 
-        self.client = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
+            self.client.connect(
+                (self.server_ip, 5555)
+            )
 
-        self.client.connect(("127.0.0.1", 5555))
+            # Send username to server
+            self.client.send(
+                self.username.encode()
+            )
+            self.chat_box.append(f"Connected as {self.username}")
 
-        # Send username to server
-        self.client.send(self.username.encode())
+            threading.Thread(
+                target=self.receive_messages,
+                daemon=True
+            ).start()
 
-        # Start receiving thread
-        threading.Thread(
-            target=self.receive_messages,
-            daemon=True
-        ).start()
+        except Exception as e:
+            self.chat_box.append(
+                f"[Connection Error] {e}"
+            )
 
     def send_message(self):
-        message = self.message_input.text()
+        message = self.message_input.text().strip()
 
-        if message:
-            try:
-                self.client.send(message.encode())
+        if not message:
+            return
 
-                self.chat_box.append(
-                    f"You: {message}"
-                )
+        try:
+            self.client.send(
+                message.encode()
+            )
 
-                self.message_input.clear()
+            self.chat_box.append(
+                f"You: {message}"
+            )
 
-            except Exception as e:
-                self.chat_box.append(
-                    f"[ERROR] {e}"
-                )
+            self.message_input.clear()
+
+        except Exception as e:
+            self.chat_box.append(
+                f"[Send Error] {e}"
+            )
 
     def receive_messages(self):
         while True:
@@ -98,19 +109,63 @@ class ChatWindow(QWidget):
 
                 self.message_received.emit(message)
 
-            except Exception as e:
-                self.message_received.emit(
-                    f"[ERROR] {e}"
-                )
+            except:
                 break
 
     def display_message(self, message):
         self.chat_box.append(message)
 
 
+class LoginWindow(QWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("LANLink Login")
+        self.resize(300, 150)
+
+        layout = QVBoxLayout()
+
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Username")
+
+        self.ip_input = QLineEdit()
+        self.ip_input.setPlaceholderText("Server IP")
+        self.ip_input.setText("127.0.0.1")
+
+        self.connect_button = QPushButton("Connect")
+
+        layout.addWidget(self.username_input)
+        layout.addWidget(self.ip_input)
+        layout.addWidget(self.connect_button)
+
+        self.setLayout(layout)
+
+        self.connect_button.clicked.connect(
+            self.connect_to_chat
+        )
+
+    def connect_to_chat(self):
+
+        username = self.username_input.text().strip()
+        server_ip = self.ip_input.text().strip()
+
+        if not username:
+            return
+
+        self.chat_window = ChatWindow(
+            username,
+            server_ip
+        )
+
+        self.chat_window.show()
+
+        self.close()
+
+
 app = QApplication(sys.argv)
 
-window = ChatWindow()
+window = LoginWindow()
 
 window.show()
 
