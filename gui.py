@@ -36,6 +36,14 @@ main_layout.addWidget(chat_box)
 main_layout.addLayout(input_layout)
 
 window.setLayout(main_layout)
+def send_message():
+    message = message_input.text()
+
+    if message:
+        chat_box.append(f"You: {message}")
+        message_input.clear()
+send_button.clicked.connect(send_message)
+message_input.returnPressed.connect(send_message)
 
 window.show()
 
