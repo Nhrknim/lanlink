@@ -223,6 +223,9 @@ class ChatWindow(QWidget):
             for user in data["users"]:
                 self.user_list.addItem(user)
 
+        elif data["type"]=="file":
+            self.chat_box.append(f"📁 {data['sender']} sent file: {data['filename']}")
+
     def select_file(self):
 
         file_path, _ = QFileDialog.getOpenFileName(
@@ -230,11 +233,26 @@ class ChatWindow(QWidget):
             "Select File"
         )
 
-        if file_path:
 
-            self.chat_box.append(
-                f"Selected file: {file_path}"
-            )
+        if not file_path:
+            return
+
+
+        filename = file_path.split("/")[-1]
+
+
+        file_data = {
+            "type": "file",
+            "filename": filename
+        }
+
+
+        self.send_json(file_data)
+
+
+        self.chat_box.append(
+            f"📁 File selected: {filename}"
+        )
 
 
 class LoginWindow(QWidget):

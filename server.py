@@ -101,6 +101,16 @@ def handle_client(client):
                     message,
                     client
                 )
+            elif data["type"] == "file":
+                file_message={
+                    "type":"file",
+                    "sender":username,
+                    "filename":data["filename"]
+
+                }
+
+                broadcast(file_message,client)
+                
 
 
         except Exception as e:
