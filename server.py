@@ -102,14 +102,50 @@ def handle_client(client):
                     client
                 )
             elif data["type"] == "file":
-                file_message={
-                    "type":"file",
-                    "sender":username,
-                    "filename":data["filename"]
 
+                file_message = {
+                    "type": "file",
+                    "sender": username,
+                    "filename": data["filename"],
+                    "size": data["size"]
                 }
 
-                broadcast(file_message,client)
+
+                # Send file information first
+                broadcast(
+                    file_message,
+                    client
+                )
+
+
+                remaining = data["size"]
+
+
+                while remaining > 0:
+
+                    chunk = client.recv(
+                        min(4096, remaining)
+                    )
+
+
+                    if not chunk:
+                        break
+
+
+                    remaining -= len(chunk)
+
+
+                    # Forward bytes to receivers
+                    for other in list(clients.keys()):
+
+                        if other != client:
+
+                            other.send(chunk)
+
+
+                print(
+                    f"File transfer completed: {data['filename']}"
+                )
                 
 
 

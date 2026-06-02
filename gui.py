@@ -2,6 +2,7 @@ import sys
 import socket
 import threading
 import json
+import os
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
@@ -189,18 +190,70 @@ class ChatWindow(QWidget):
             )
 
     def receive_messages(self):
+
         while True:
+
             try:
+
                 data = self.receive_json()
 
                 if data is None:
                     break
 
-                self.message_received.emit(data)
+                if data["type"] == "file":
+
+                    self.receive_file(data)
+
+                else:
+
+                    self.message_received.emit(data)
 
             except Exception as e:
-                print("GUI receive error:", e)
+
+                print(e)
                 break
+
+    def receive_file(self, data):
+
+        filename = data["filename"]
+        file_size = data["size"]
+
+        os.makedirs(
+            "downloads",
+            exist_ok=True
+        )
+
+        path = os.path.join(
+            "downloads",
+            filename
+        )
+
+        received = 0
+
+        with open(path, "wb") as file:
+
+            while received < file_size:
+
+                chunk = self.client.recv(
+                    min(
+                        4096,
+                        file_size - received
+                    )
+                )
+
+                if not chunk:
+                    break
+
+                file.write(chunk)
+
+                received += len(chunk)
+
+        self.message_received.emit(
+            {
+                "type": "system",
+                "message": f"📁 Received file from {data['sender']}: {filename}"
+            }
+        )
 
     def display_message(self, data):
 
@@ -223,9 +276,6 @@ class ChatWindow(QWidget):
             for user in data["users"]:
                 self.user_list.addItem(user)
 
-        elif data["type"]=="file":
-            self.chat_box.append(f"📁 {data['sender']} sent file: {data['filename']}")
-
     def select_file(self):
 
         file_path, _ = QFileDialog.getOpenFileName(
@@ -233,25 +283,35 @@ class ChatWindow(QWidget):
             "Select File"
         )
 
-
         if not file_path:
             return
 
-
         filename = file_path.split("/")[-1]
-
+        file_size = os.path.getsize(file_path)
 
         file_data = {
             "type": "file",
-            "filename": filename
+            "filename": filename,
+            "size": file_size
         }
 
-
+        # send file information
         self.send_json(file_data)
 
+        # send actual file bytes
+        with open(file_path, "rb") as file:
+
+            while True:
+
+                chunk = file.read(4096)
+
+                if not chunk:
+                    break
+
+                self.client.send(chunk)
 
         self.chat_box.append(
-            f"📁 File selected: {filename}"
+            f"📤 You sent: {filename}"
         )
 
 
