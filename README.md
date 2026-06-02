@@ -1,42 +1,99 @@
-# LANLink
+# 🔗 LANLink
 
-LANLink is a LAN-based real-time chat application developed using Python, PyQt6, TCP sockets, and multithreading. The application implements a client-server architecture, enabling multiple users connected to the same local network to communicate through a modern graphical interface.
+A simple LAN-based chat application that lets devices connected to the same network communicate and share files in real time.
 
-The server manages concurrent client connections using dedicated threads and facilitates real-time message broadcasting between connected users. The client application provides a user-friendly interface for connecting to a server, exchanging messages, and viewing active participants through a dynamically updated online users panel.
+LANLink started as an experiment with socket programming and is being built into a lightweight local messaging app.
 
-This project demonstrates practical implementation of computer networking concepts including TCP/IP communication, socket programming, concurrent connection handling, message broadcasting, real-time data exchange, and application-layer protocol design, while also showcasing desktop application development using PyQt6.
+---
 
-## How to Run
+## ✨ Features
 
-### Start the Server
+💬 **Real-time Chat**  
+Send and receive messages instantly between multiple users on the same network.
+
+👥 **Multi-user Support**  
+Multiple clients can join the same chat room and communicate together.
+
+📁 **File Sharing**  
+Transfer files directly between connected users over LAN.
+
+🟢 **Online Users**  
+View currently connected users in real time.
+
+🌙 **Desktop Interface**  
+Clean dark-themed GUI built with PyQt6.
+
+---
+
+## 🛠️ Built With
+
+- Python
+- PyQt6
+- TCP Sockets
+- Multithreading
+- JSON-based communication protocol
+
+---
+
+## ⚙️ How It Works
+
+```
+             LANLink Server
+                   |
+        -----------------------
+        |                     |
+     Client A              Client B
+
+     Message  ------------> Message
+     File     ------------> File
+```
+
+The server manages connected clients and routes messages/files between them using TCP sockets.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Run the server
 
 ```bash
 python server.py
 ```
 
-### Start the Client
+### 2. Start LANLink
 
 ```bash
 python gui.py
 ```
 
-Enter a username and the server IP address, then click **Connect**.
+Enter:
 
-## Current Status
+- Your username
+- Server IP address
 
-### Implemented
+and start chatting.
 
-- Real-time LAN chat
-- Multi-client support
-- Username-based communication
-- Online users panel
-- Join/leave notifications
-- PyQt6 graphical interface
-- Dark theme
+---
 
-### Planned
+## 📌 Current Progress
 
-- File sharing
-- JSON-based messaging protocol
-- Private messaging
-- Message encryption
+Completed:
+
+- ✅ LAN messaging
+- ✅ Multiple users
+- ✅ User presence
+- ✅ File transfer
+- ✅ Desktop GUI
+
+Coming next:
+
+- 🔒 Private messaging
+- 👥 Custom chat groups
+- 🔍 Automatic LAN discovery
+- 📦 Desktop app packaging
+
+---
+
+## 🎯 Goal
+
+The goal of LANLink is to create a simple local network messenger where users can create rooms, discover nearby devices, chat, and share files without depending on an internet connection.
