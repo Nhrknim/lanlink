@@ -1,106 +1,191 @@
 import socket
 import threading
+import json
+
 
 HOST = "0.0.0.0"
 PORT = 5555
+
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
 server.listen()
 server.settimeout(1)
 
-clients = {}  # {socket: username}
+
+clients = {}   # {socket: username}
+
 
 print(f"Server running on port {PORT}")
 
 
+# ---------- JSON HELPERS ----------
+
+def send_json(client, data):
+    message = json.dumps(data) + "\n"
+
+    client.send(
+        message.encode()
+    )
+
+def receive_json(client):
+    data = client.recv(1024).decode()
+
+    if not data:
+        return None
+
+    return json.loads(data)
+
+
+# ---------- BROADCAST MESSAGE ----------
+
 def broadcast(message, sender=None):
+
     for client in list(clients.keys()):
+
         if client != sender:
             try:
-                client.send(message.encode())
+                send_json(client, message)
+
             except:
                 if client in clients:
                     del clients[client]
+
                 client.close()
 
-def send_user_list():
-    users = ",".join(clients.values())
 
-    message = f"USERS:{users}"
+# ---------- ONLINE USERS ----------
+
+def send_user_list():
+
+    data = {
+        "type": "users",
+        "users": list(clients.values())
+    }
 
     for client in list(clients.keys()):
         try:
-            client.send(message.encode())
+            send_json(client, data)
+
         except:
             pass
 
+
+# ---------- HANDLE EACH CLIENT ----------
+
 def handle_client(client):
+
     username = clients[client]
 
     while True:
         try:
-            message = client.recv(1024).decode()
+            data = receive_json(client)
 
-            if not message:
+            if data is None:
                 break
 
-            full_message = f"{username}: {message}"
 
-            print(full_message)
+            if data["type"] == "chat":
 
-            broadcast(full_message, client)
+                message = {
+                    "type": "chat",
+                    "sender": username,
+                    "message": data["message"]
+                }
+
+                print(
+                    f"{username}: {data['message']}"
+                )
+
+                broadcast(
+                    message,
+                    client
+                )
+
 
         except Exception as e:
             print("Error:", e)
             break
 
-    leave_message = f"*** {username} left the chat ***"
 
-    print(leave_message)
+    # Client disconnected
 
     if client in clients:
         del clients[client]
 
-    broadcast(leave_message)
-    send_user_list()
 
+    leave_message = {
+        "type": "system",
+        "message": f"{username} left the chat"
+    }
+
+
+    print(leave_message["message"])
+
+    broadcast(leave_message)
+
+    send_user_list()
 
     client.close()
 
 
+# ---------- SERVER LOOP ----------
+
 try:
+
     while True:
+
         try:
             client_socket, client_address = server.accept()
 
-            # Receive username from client
-            username = client_socket.recv(1024).decode()
 
-            # Store socket -> username mapping
+            # Receive login details
+
+            login_data = receive_json(client_socket)
+
+            username = login_data["username"]
+
+
             clients[client_socket] = username
 
-            print(f"{username} connected from {client_address}")
 
-            join_message = f"*** {username} joined the chat ***"
+            print(
+                f"{username} connected from {client_address}"
+            )
 
-            print(join_message)
+
+            join_message = {
+                "type": "system",
+                "message": f"{username} joined the chat"
+            }
+
 
             broadcast(join_message)
+
             send_user_list()
+
 
             thread = threading.Thread(
                 target=handle_client,
-                args=(client_socket,)
+                args=(client_socket,),
+                daemon=True
             )
 
             thread.start()
 
+
         except socket.timeout:
             continue
 
+
 except KeyboardInterrupt:
+
     print("\nServer shutting down...")
 
+
 finally:
+
+    for client in list(clients.keys()):
+        client.close()
+
     server.close()

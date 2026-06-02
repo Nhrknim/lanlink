@@ -1,46 +1,111 @@
 import socket
 import threading
+import json
 
-SERVER_IP = input("Enter server IP: ")
+SERVER_IP = input("Enter server IP:")
+USERNAME = input("Enter username:")
+
 PORT = 5555
 
-username = input("Enter username: ")
-
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 client.connect((SERVER_IP, PORT))
+buffer = ""
 
-client.send(username.encode())
+# ----------JSON HELPERS-----------
 
-print("Connected!")
+
+def send_json(data):
+
+    message = json.dumps(data) + "\n"
+
+    client.send(
+        message.encode()
+    )
+
+
+def receive_json():
+
+    global buffer
+
+
+    while "\n" not in buffer:
+
+        data = client.recv(1024).decode()
+
+
+        if not data:
+            return None
+
+
+        buffer += data
+
+
+    message, buffer = buffer.split(
+        "\n",
+        1
+    )
+
+
+    return json.loads(message)
+
+# ---------------LOGIN-----------------
+
+
+login_data = {
+    "type": "login",
+    "username": USERNAME
+}
+
+send_json(login_data)
+
+# -----------RECEIVE THREAD------------
 
 
 def receive_messages():
     while True:
         try:
-            message = client.recv(1024).decode()
+            data = receive_json()
 
-            if not message:
+            if data is None:
                 break
 
-            print(f"\n{message}")
-
-        except:
+            if data["type"] == "chat":
+                print(
+                    f"{data['sender']} : {data['message']}"
+                )
+            elif data['type'] == "system":
+                print(
+                    f"*** {data['message']} ***"
+                )
+            elif data['type'] == "users":
+                users = ", ".join(data["users"])
+                print(f"Online users:{users}")
+        except Exception as e:
+            print("Connection closed")
             break
 
-
-threading.Thread(
-    target=receive_messages,
-    daemon=True
-).start()
+# start recieve thread
 
 
-while True:
-    message = input()
+thread = threading.Thread(target=receive_messages, daemon=True)
+thread.start()
 
-    if message.lower() == "exit":
-        break
+# --------SEND LOOP-----
 
-    client.send(message.encode())
+try:
+    while True:
 
-client.close()
+        message = input()
+
+        data = {
+            "type": "chat",
+            "message": message
+        }
+
+        send_json(data)
+
+except KeyboardInterrupt:
+
+    print("\nDisconnected")
+
+    client.close()
