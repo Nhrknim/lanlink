@@ -29,6 +29,7 @@ class ChatWindow(QWidget):
         self.username = username
         self.server_ip = server_ip
         self.buffer = ""
+        self.selected_user = None
 
         self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
@@ -77,6 +78,8 @@ class ChatWindow(QWidget):
 
         self.chat_box = QTextEdit()
         self.chat_box.setReadOnly(True)
+
+        self.chat_title = QLabel("General Chat")
         self.users_label = QLabel("Online Users")
         user_layout = QVBoxLayout()
 
@@ -93,7 +96,11 @@ class ChatWindow(QWidget):
         self.send_button = QPushButton("Send")
         self.file_button = QPushButton("File")
 
-        chat_layout.addWidget(self.chat_box, 3)
+        message_area = QVBoxLayout()
+        message_area.addWidget(self.chat_title)
+        message_area.addWidget(self.chat_box)
+
+        chat_layout.addLayout(message_area, 3)
         chat_layout.addLayout(user_layout, 1)
         layout.addLayout(chat_layout)
 
@@ -111,6 +118,10 @@ class ChatWindow(QWidget):
         self.message_input.returnPressed.connect(self.send_message)
 
         self.message_received.connect(self.display_message)
+
+        self.user_list.itemClicked.connect(
+            self.select_user
+        )        
 
         try:
             self.client = socket.socket(
@@ -170,13 +181,24 @@ class ChatWindow(QWidget):
             return
 
         try:
-            self.send_json(
-                {
+            if self.selected_user:
+
+                data = {
+                    "type": "private",
+                    "to": self.selected_user,
+                    "message": message
+                }
+
+
+            else:
+
+                data = {
                     "type": "chat",
                     "message": message
-
                 }
-            )
+
+
+            self.send_json(data)
 
             self.chat_box.append(
                 f"You: {message}"
@@ -248,10 +270,24 @@ class ChatWindow(QWidget):
 
                 received += len(chunk)
 
+        if data["private"]:
+
+            message = (
+                f"🔒 Private file from {data['sender']}: {filename}"
+            )
+
+
+        else:
+
+            message = (
+                f"📁 File from {data['sender']}: {filename}"
+            )
+
+
         self.message_received.emit(
             {
                 "type": "system",
-                "message": f"📁 Received file from {data['sender']}: {filename}"
+                "message": message
             }
         )
 
@@ -273,8 +309,17 @@ class ChatWindow(QWidget):
 
             self.user_list.clear()
 
+            self.user_list.addItem("🌐 General")
+
             for user in data["users"]:
+                if user == self.username:
+                    continue
                 self.user_list.addItem(user)
+        elif data["type"] == "private":
+
+            self.chat_box.append(
+                f"🔒 {data['sender']}: {data['message']}"
+            )       
 
     def select_file(self):
 
@@ -292,7 +337,8 @@ class ChatWindow(QWidget):
         file_data = {
             "type": "file",
             "filename": filename,
-            "size": file_size
+            "size": file_size,
+            "to": self.selected_user
         }
 
         # send file information
@@ -313,7 +359,26 @@ class ChatWindow(QWidget):
         self.chat_box.append(
             f"📤 You sent: {filename}"
         )
+    def select_user(self, item):
 
+        user = item.text()
+
+        if user == "🌐 General":
+            self.selected_user = None
+            self.chat_title.setText("General Chat")
+            return
+
+
+        if user == self.username:
+            return
+
+
+        self.selected_user = user
+
+
+        self.chat_title.setText(
+            f"Chat with {user}"
+        )
 
 class LoginWindow(QWidget):
 

@@ -28,6 +28,7 @@ def send_json(client, data):
         message.encode()
     )
 
+
 def receive_json(client):
     data = client.recv(1024).decode()
 
@@ -84,7 +85,6 @@ def handle_client(client):
             if data is None:
                 break
 
-
             if data["type"] == "chat":
 
                 message = {
@@ -101,70 +101,109 @@ def handle_client(client):
                     message,
                     client
                 )
+            elif data["type"] == "private":
+
+                private_message = {
+                    "type": "private",
+                    "sender": username,
+                    "message": data["message"]
+                }
+
+                for user_socket, user_name in clients.items():
+
+                    if user_name == data["to"]:
+
+                        send_json(
+                            user_socket,
+                            private_message
+                        )
+
+                        break
             elif data["type"] == "file":
+
+                # ---------- CREATE FILE HEADER ----------
 
                 file_message = {
                     "type": "file",
                     "sender": username,
                     "filename": data["filename"],
-                    "size": data["size"]
+                    "size": data["size"],
+                    "private": bool(data.get("to"))
                 }
 
+                # ---------- FIND RECEIVERS ----------
 
-                # Send file information first
-                broadcast(
-                    file_message,
-                    client
-                )
+                receivers = []
 
+                # Private file transfer
+                if data.get("to"):
+
+                    for user_socket, user_name in clients.items():
+
+                        if user_name == data["to"]:
+
+                            receivers.append(user_socket)
+                            break
+
+                # Public file transfer
+                else:
+
+                    for user_socket in list(clients.keys()):
+
+                        if user_socket != client:
+
+                            receivers.append(user_socket)
+
+                # ---------- SEND FILE HEADER ----------
+
+                for receiver in receivers:
+
+                    send_json(
+                        receiver,
+                        file_message
+                    )
+
+                # ---------- TRANSFER FILE DATA ----------
 
                 remaining = data["size"]
-
 
                 while remaining > 0:
 
                     chunk = client.recv(
-                        min(4096, remaining)
+                        min(
+                            4096,
+                            remaining
+                        )
                     )
-
 
                     if not chunk:
                         break
 
-
                     remaining -= len(chunk)
 
+                    for receiver in receivers:
 
-                    # Forward bytes to receivers
-                    for other in list(clients.keys()):
-
-                        if other != client:
-
-                            other.send(chunk)
-
+                        receiver.send(
+                            chunk
+                        )
 
                 print(
                     f"File transfer completed: {data['filename']}"
                 )
-                
-
 
         except Exception as e:
             print("Error:", e)
             break
-
 
     # Client disconnected
 
     if client in clients:
         del clients[client]
 
-
     leave_message = {
         "type": "system",
         "message": f"{username} left the chat"
     }
-
 
     print(leave_message["message"])
 
@@ -184,32 +223,26 @@ try:
         try:
             client_socket, client_address = server.accept()
 
-
             # Receive login details
 
             login_data = receive_json(client_socket)
 
             username = login_data["username"]
 
-
             clients[client_socket] = username
-
 
             print(
                 f"{username} connected from {client_address}"
             )
-
 
             join_message = {
                 "type": "system",
                 "message": f"{username} joined the chat"
             }
 
-
             broadcast(join_message)
 
             send_user_list()
-
 
             thread = threading.Thread(
                 target=handle_client,
@@ -218,7 +251,6 @@ try:
             )
 
             thread.start()
-
 
         except socket.timeout:
             continue
