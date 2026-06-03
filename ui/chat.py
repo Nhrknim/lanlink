@@ -2,6 +2,7 @@ import sys
 import socket
 import threading
 import os
+from datetime import datetime
 from network.protocol import send_json, receive_json
 
 from PyQt6.QtCore import pyqtSignal
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFileDialog
 )
+
 
 class ChatWindow(QWidget):
 
@@ -120,7 +122,7 @@ class ChatWindow(QWidget):
 
         self.user_list.itemClicked.connect(
             self.select_user
-        )        
+        )
 
         try:
             self.client = socket.socket(
@@ -153,9 +155,6 @@ class ChatWindow(QWidget):
                 f"[Connection Error] {e}"
             )
 
-
-
-
     def send_message(self):
         message = self.message_input.text().strip()
 
@@ -171,7 +170,6 @@ class ChatWindow(QWidget):
                     "message": message
                 }
 
-
             else:
 
                 data = {
@@ -179,11 +177,12 @@ class ChatWindow(QWidget):
                     "message": message
                 }
 
-
             send_json(self.client, data)
 
+            time = datetime.now().strftime("%I:%M %p")
+
             self.chat_box.append(
-                f"You: {message}"
+                f"You ({time}): {message}"
             )
 
             self.message_input.clear()
@@ -199,7 +198,7 @@ class ChatWindow(QWidget):
 
             try:
 
-                data, self.buffer = receive_json(self.client,self.buffer)
+                data, self.buffer = receive_json(self.client, self.buffer)
 
                 if data is None:
                     break
@@ -258,13 +257,11 @@ class ChatWindow(QWidget):
                 f"🔒 Private file from {data['sender']}: {filename}"
             )
 
-
         else:
 
             message = (
                 f"📁 File from {data['sender']}: {filename}"
             )
-
 
         self.message_received.emit(
             {
@@ -276,9 +273,10 @@ class ChatWindow(QWidget):
     def display_message(self, data):
 
         if data["type"] == "chat":
+            time = datetime.now().strftime("%I:%M %p")
 
             self.chat_box.append(
-                f"{data['sender']}: {data['message']}"
+                f"{data['sender']} ({time}): {data['message']}"
             )
 
         elif data["type"] == "system":
@@ -298,10 +296,11 @@ class ChatWindow(QWidget):
                     continue
                 self.user_list.addItem(user)
         elif data["type"] == "private":
+            time = datetime.now().strftime("%I:%M %p")
 
             self.chat_box.append(
-                f"🔒 {data['sender']}: {data['message']}"
-            )       
+                f"🔒 {data['sender']} ({time}): {data['message']}"
+            )
 
     def select_file(self):
 
@@ -324,7 +323,7 @@ class ChatWindow(QWidget):
         }
 
         # send file information
-        send_json(self.client,file_data)
+        send_json(self.client, file_data)
 
         # send actual file bytes
         with open(file_path, "rb") as file:
@@ -341,6 +340,7 @@ class ChatWindow(QWidget):
         self.chat_box.append(
             f"📤 You sent: {filename}"
         )
+
     def select_user(self, item):
 
         user = item.text()
@@ -350,13 +350,10 @@ class ChatWindow(QWidget):
             self.chat_title.setText("General Chat")
             return
 
-
         if user == self.username:
             return
 
-
         self.selected_user = user
-
 
         self.chat_title.setText(
             f"Chat with {user}"
