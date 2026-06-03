@@ -1,8 +1,8 @@
 import sys
 import socket
 import threading
-import json
 import os
+from network.protocol import send_json, receive_json
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
@@ -135,7 +135,8 @@ class ChatWindow(QWidget):
 
             # Send username to server
 
-            self.send_json(
+            send_json(
+                self.client,
                 {
                     "type": "login",
                     "username": self.username
@@ -153,26 +154,8 @@ class ChatWindow(QWidget):
                 f"[Connection Error] {e}"
             )
 
-    def send_json(self, data):
-        message = json.dumps(data) + "\n"
-        self.client.send(message.encode())
 
-    def receive_json(self):
 
-        while "\n" not in self.buffer:
-
-            data = self.client.recv(1024).decode()
-
-            if not data:
-                return None
-
-            self.buffer += data
-
-        message, self.buffer = (
-            self.buffer.split("\n", 1)
-        )
-
-        return json.loads(message)
 
     def send_message(self):
         message = self.message_input.text().strip()
@@ -198,7 +181,7 @@ class ChatWindow(QWidget):
                 }
 
 
-            self.send_json(data)
+            send_json(self.client, data)
 
             self.chat_box.append(
                 f"You: {message}"
@@ -217,7 +200,7 @@ class ChatWindow(QWidget):
 
             try:
 
-                data = self.receive_json()
+                data, self.buffer = receive_json(self.client,self.buffer)
 
                 if data is None:
                     break
@@ -342,7 +325,7 @@ class ChatWindow(QWidget):
         }
 
         # send file information
-        self.send_json(file_data)
+        send_json(self.client,file_data)
 
         # send actual file bytes
         with open(file_path, "rb") as file:

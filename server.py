@@ -1,6 +1,7 @@
 import socket
 import threading
-import json
+from network.protocol import send_json, receive_json
+
 
 
 HOST = "0.0.0.0"
@@ -14,28 +15,11 @@ server.settimeout(1)
 
 
 clients = {}   # {socket: username}
+buffers = {}
 
 
 print(f"Server running on port {PORT}")
 
-
-# ---------- JSON HELPERS ----------
-
-def send_json(client, data):
-    message = json.dumps(data) + "\n"
-
-    client.send(
-        message.encode()
-    )
-
-
-def receive_json(client):
-    data = client.recv(1024).decode()
-
-    if not data:
-        return None
-
-    return json.loads(data)
 
 
 # ---------- BROADCAST MESSAGE ----------
@@ -49,8 +33,8 @@ def broadcast(message, sender=None):
                 send_json(client, message)
 
             except:
-                if client in clients:
-                    del clients[client]
+                if client in buffers:
+                    del buffers[client]
 
                 client.close()
 
@@ -80,7 +64,7 @@ def handle_client(client):
 
     while True:
         try:
-            data = receive_json(client)
+            data, buffers[client] = receive_json(client, buffers[client])
 
             if data is None:
                 break
@@ -225,7 +209,8 @@ try:
 
             # Receive login details
 
-            login_data = receive_json(client_socket)
+            buffers[client_socket] = ""
+            login_data, buffers[client_socket] = receive_json(client_socket,buffers[client_socket])
 
             username = login_data["username"]
 
