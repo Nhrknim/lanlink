@@ -53,6 +53,7 @@ class CreateRoomWindow(QWidget):
         threading.Thread(target=broadcast_room, args=(room_name, username), daemon=True).start()
 
         self.chat = ChatWindow(username, "127.0.0.1")
+        self.chat.is_host = True
         self.chat.show()
 
         self.close()

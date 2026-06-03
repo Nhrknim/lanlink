@@ -14,10 +14,21 @@ server=None
 clients = {}   # {socket: username}
 buffers = {}
 
+running = True
 
 
+def stop_server():
 
+    global running
 
+    running = False
+
+    shutdown_message = {
+        "type": "shutdown",
+        "message": "Room closed by host"
+    }
+
+    broadcast(shutdown_message)
 
 # ---------- BROADCAST MESSAGE ----------
 
@@ -210,7 +221,7 @@ def start_server():
 
     try:
 
-        while True:
+        while running:
 
             try:
                 client_socket, client_address = server.accept()
@@ -258,6 +269,11 @@ def start_server():
 
 
     finally:
+        shutdown_message ={
+            "type": "shutdown",
+            "message": "Room closed by host"
+        }
+        broadcast(shutdown_message)
 
         for client in list(clients.keys()):
             client.close()

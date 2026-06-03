@@ -1,99 +1,34 @@
 # 🔗 LANLink
 
-A simple LAN-based chat application that lets devices connected to the same network communicate and share files in real time.
+LANLink is a LAN-based chat application built with Python.
 
-LANLink started as an experiment with socket programming and is being built into a lightweight local messaging app.
+It lets users on the same network create and join chat rooms, send messages, and share files without needing the internet or an external server.
 
----
+The project is built to learn how real-time communication systems work using sockets and desktop application development.
 
-## ✨ Features
+## Features
 
-💬 **Real-time Chat**  
-Send and receive messages instantly between multiple users on the same network.
+- Create and join LAN rooms
+- Automatic room discovery
+- Group chat
+- Private messaging
+- Online users list
+- File sharing
+- Simple messenger-style interface
 
-👥 **Multi-user Support**  
-Multiple clients can join the same chat room and communicate together.
-
-📁 **File Sharing**  
-Transfer files directly between connected users over LAN.
-
-🟢 **Online Users**  
-View currently connected users in real time.
-
-🌙 **Desktop Interface**  
-Clean dark-themed GUI built with PyQt6.
-
----
-
-## 🛠️ Built With
+## Built With
 
 - Python
 - PyQt6
 - TCP Sockets
-- Multithreading
-- JSON-based communication protocol
+- UDP Broadcast
+- JSON
 
----
+## Future Improvements
 
-## ⚙️ How It Works
+- Better file sharing
+- Chat history
+- Security features
+- Desktop app packaging
 
-```
-             LANLink Server
-                   |
-        -----------------------
-        |                     |
-     Client A              Client B
-
-     Message  ------------> Message
-     File     ------------> File
-```
-
-The server manages connected clients and routes messages/files between them using TCP sockets.
-
----
-
-## 🚀 Getting Started
-
-### 1. Run the server
-
-```bash
-python server.py
-```
-
-### 2. Start LANLink
-
-```bash
-python gui.py
-```
-
-Enter:
-
-- Your username
-- Server IP address
-
-and start chatting.
-
----
-
-## 📌 Current Progress
-
-Completed:
-
-- ✅ LAN messaging
-- ✅ Multiple users
-- ✅ User presence
-- ✅ File transfer
-- ✅ Desktop GUI
-
-Coming next:
-
-- 🔒 Private messaging
-- 👥 Custom chat groups
-- 🔍 Automatic LAN discovery
-- 📦 Desktop app packaging
-
----
-
-## 🎯 Goal
-
-The goal of LANLink is to create a simple local network messenger where users can create rooms, discover nearby devices, chat, and share files without depending on an internet connection.
+🚧 Work in progress

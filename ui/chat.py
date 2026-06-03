@@ -4,12 +4,12 @@ import threading
 import os
 from datetime import datetime
 from network.protocol import send_json, receive_json
-
-from PyQt6.QtCore import pyqtSignal
+from network.server import stop_server
+from PyQt6.QtCore import pyqtSignal, Qt, QSize, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
-    QTextEdit,
+    QListWidgetItem,
     QLineEdit,
     QPushButton,
     QVBoxLayout,
@@ -31,6 +31,7 @@ class ChatWindow(QWidget):
         self.server_ip = server_ip
         self.buffer = ""
         self.selected_user = None
+        self.is_host = False
 
         self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
@@ -77,8 +78,7 @@ class ChatWindow(QWidget):
         layout = QVBoxLayout()
         chat_layout = QHBoxLayout()
 
-        self.chat_box = QTextEdit()
-        self.chat_box.setReadOnly(True)
+        self.chat_box = QListWidget()
 
         self.chat_title = QLabel("General Chat")
         self.users_label = QLabel("Online Users")
@@ -143,7 +143,7 @@ class ChatWindow(QWidget):
                     "username": self.username
                 }
             )
-            self.chat_box.append(f"Connected as {self.username}")
+            self.add_system_message(f"Connected as {self.username}")
 
             threading.Thread(
                 target=self.receive_messages,
@@ -151,9 +151,97 @@ class ChatWindow(QWidget):
             ).start()
 
         except Exception as e:
-            self.chat_box.append(
+            self.add_system_message(
                 f"[Connection Error] {e}"
             )
+
+    def closeEvent(self, event):
+
+        if self.is_host:
+
+            stop_server()
+
+        event.accept()
+
+    def add_message(self, sender, message, own=False):
+
+        item = QListWidgetItem()
+
+        row = QWidget()
+        row_layout = QHBoxLayout()
+        row_layout.setContentsMargins(5, 2, 5, 2)
+
+        message_block = QWidget()
+        block_layout = QVBoxLayout()
+        block_layout.setContentsMargins(0, 0, 0, 0)
+        block_layout.setSpacing(3)
+
+        name = QLabel(sender)
+
+        bubble = QLabel(message)
+        bubble.setWordWrap(True)
+        bubble.setMaximumWidth(350)
+
+        bubble.setStyleSheet(
+            """
+            QLabel {
+                padding: 8px;
+                border-radius: 10px;
+                background-color: #333333;
+            }
+            """
+        )
+
+        if own:
+            name.setAlignment(Qt.AlignmentFlag.AlignRight)
+        else:
+            name.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        block_layout.addWidget(name)
+        block_layout.addWidget(bubble)
+
+        message_block.setLayout(block_layout)
+
+        if own:
+            row_layout.addStretch()
+            row_layout.addWidget(message_block)
+
+        else:
+            row_layout.addWidget(message_block)
+            row_layout.addStretch()
+
+        row.setLayout(row_layout)
+
+        row.adjustSize()
+        item.setSizeHint(row.sizeHint())
+
+        self.chat_box.addItem(item)
+        self.chat_box.setItemWidget(item, row)
+
+        self.chat_box.scrollToBottom()
+
+    def add_system_message(self, message):
+
+        item = QListWidgetItem()
+
+        label = QLabel(message)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        label.setStyleSheet(
+            """
+            QLabel {
+                color: #aaaaaa;
+                padding: 5px;
+            }
+            """
+        )
+
+        item.setSizeHint(label.sizeHint())
+
+        self.chat_box.addItem(item)
+        self.chat_box.setItemWidget(item, label)
+
+        self.chat_box.scrollToBottom()
 
     def send_message(self):
         message = self.message_input.text().strip()
@@ -181,14 +269,17 @@ class ChatWindow(QWidget):
 
             time = datetime.now().strftime("%I:%M %p")
 
-            self.chat_box.append(
-                f"You ({time}): {message}"
+            self.add_message(
+                f"You ({time})",
+                message,
+                own=True
             )
 
             self.message_input.clear()
 
         except Exception as e:
-            self.chat_box.append(
+            self.add_message(
+                "System",
                 f"[Send Error] {e}"
             )
 
@@ -275,14 +366,15 @@ class ChatWindow(QWidget):
         if data["type"] == "chat":
             time = datetime.now().strftime("%I:%M %p")
 
-            self.chat_box.append(
-                f"{data['sender']} ({time}): {data['message']}"
+            self.add_message(
+                f"{data['sender']} ({time})",
+                data["message"]
             )
 
         elif data["type"] == "system":
 
-            self.chat_box.append(
-                f"*** {data['message']} ***"
+            self.add_system_message(
+                data["message"]
             )
 
         elif data["type"] == "users":
@@ -298,9 +390,15 @@ class ChatWindow(QWidget):
         elif data["type"] == "private":
             time = datetime.now().strftime("%I:%M %p")
 
-            self.chat_box.append(
-                f"🔒 {data['sender']} ({time}): {data['message']}"
+            self.add_message(
+                f"🔒 {data['sender']} ({time})",
+                data["message"]
             )
+        elif data["type"] == "shutdown":
+
+            self.add_system_message(data["message"])
+
+            QTimer.singleShot(2000, self.close)
 
     def select_file(self):
 
@@ -337,8 +435,10 @@ class ChatWindow(QWidget):
 
                 self.client.send(chunk)
 
-        self.chat_box.append(
-            f"📤 You sent: {filename}"
+        self.add_message(
+            "You",
+            f"📤 Sent {filename}",
+            own=True
         )
 
     def select_user(self, item):
