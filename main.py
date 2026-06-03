@@ -1,12 +1,12 @@
 import sys
 
 from PyQt6.QtWidgets import QApplication
-from ui.login import LoginWindow
+from ui.start import StartWindow
 
 
 app = QApplication(sys.argv)
 
-window = LoginWindow()
+window = StartWindow()
 window.show()
 
 sys.exit(app.exec())

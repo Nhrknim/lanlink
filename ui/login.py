@@ -9,7 +9,7 @@ from ui.chat import ChatWindow
 
 class LoginWindow(QWidget):
 
-    def __init__(self):
+    def __init__(self,default_ip=""):
         super().__init__()
 
         self.setWindowTitle("LANLink Login")
@@ -22,7 +22,7 @@ class LoginWindow(QWidget):
 
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("Server IP")
-        self.ip_input.setText("127.0.0.1")
+        self.ip_input.setText(default_ip)
 
         self.connect_button = QPushButton("Connect")
 

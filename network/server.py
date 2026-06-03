@@ -8,17 +8,14 @@ HOST = "0.0.0.0"
 PORT = 5555
 
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST, PORT))
-server.listen()
-server.settimeout(1)
+server=None
 
 
 clients = {}   # {socket: username}
 buffers = {}
 
 
-print(f"Server running on port {PORT}")
+
 
 
 
@@ -200,55 +197,73 @@ def handle_client(client):
 
 # ---------- SERVER LOOP ----------
 
-try:
+def start_server():
 
-    while True:
+    global server
 
-        try:
-            client_socket, client_address = server.accept()
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen()
+    server.settimeout(1)
 
-            # Receive login details
+    print(f"Server running on port {PORT}")
 
-            buffers[client_socket] = ""
-            login_data, buffers[client_socket] = receive_json(client_socket,buffers[client_socket])
+    try:
 
-            username = login_data["username"]
+        while True:
 
-            clients[client_socket] = username
+            try:
+                client_socket, client_address = server.accept()
 
-            print(
-                f"{username} connected from {client_address}"
-            )
+                # Receive login details
+                buffers[client_socket] = ""
 
-            join_message = {
-                "type": "system",
-                "message": f"{username} joined the chat"
-            }
+                login_data, buffers[client_socket] = receive_json(
+                    client_socket,
+                    buffers[client_socket]
+                )
 
-            broadcast(join_message)
+                username = login_data["username"]
 
-            send_user_list()
+                clients[client_socket] = username
 
-            thread = threading.Thread(
-                target=handle_client,
-                args=(client_socket,),
-                daemon=True
-            )
-
-            thread.start()
-
-        except socket.timeout:
-            continue
+                print(f"{username} connected from {client_address}")
 
 
-except KeyboardInterrupt:
+                join_message = {
+                    "type": "system",
+                    "message": f"{username} joined the chat"
+                }
 
-    print("\nServer shutting down...")
+                broadcast(join_message)
+
+                send_user_list()
 
 
-finally:
+                thread = threading.Thread(
+                    target=handle_client,
+                    args=(client_socket,),
+                    daemon=True
+                )
 
-    for client in list(clients.keys()):
-        client.close()
+                thread.start()
 
-    server.close()
+
+            except socket.timeout:
+                continue
+
+
+    except KeyboardInterrupt:
+        print("\nServer shutting down...")
+
+
+    finally:
+
+        for client in list(clients.keys()):
+            client.close()
+
+        server.close()
+
+
+if __name__ == "__main__":
+    start_server()
