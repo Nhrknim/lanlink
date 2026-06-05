@@ -157,11 +157,11 @@ def handle_client(client):
                     send_json(receiver, file_header)   
                     remaining = data["size"]
                     while remaining > 0:
-                        chunk = client.recv( min(4096, remaining))
+                        chunk = client.recv( min(65536, remaining))
                         if not chunk:
                             break
                         remaining -= len(chunk)
-                        receiver.send(chunk)
+                        receiver.sendall(chunk)
                     print(f"Sent {data['filename']} to {data['to']}")
 
 

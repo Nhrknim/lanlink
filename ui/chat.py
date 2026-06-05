@@ -19,7 +19,8 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QLabel,
     QFileDialog,
-    QMessageBox
+    QMessageBox,
+    QProgressBar
 )
 
 
@@ -41,6 +42,7 @@ class ChatWindow(QWidget):
         self.file_buttons = {}
         self.downloaded_files = {}
         self.file_cards = {}
+        self.file_progress = {}
 
         self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
@@ -292,6 +294,26 @@ class ChatWindow(QWidget):
 
         else:
 
+            progress = QProgressBar()
+            progress.setValue(0)
+            progress.hide()
+            progress.setStyleSheet(
+                """
+                QProgressBar {
+                    background-color: #222;
+                    border-radius: 8px;
+                    height: 12px;
+                    text-align: center;
+                }
+
+                QProgressBar::chunk {
+                    background-color: #00C853;
+                    border-radius: 8px;
+                }
+                """
+            )            
+
+
             download_button = QPushButton("Download")
 
             download_button.clicked.connect(
@@ -299,6 +321,9 @@ class ChatWindow(QWidget):
             )
             
             self.file_buttons[data["file_id"]] = download_button
+            self.file_progress[data["file_id"]] = progress
+
+            layout.addWidget(progress)
             layout.addWidget(download_button)
             sender = data["sender"]
             if sender not in self.file_cards:
@@ -460,9 +485,10 @@ class ChatWindow(QWidget):
 
         if not save_path:
             return
-
-
+        
         remaining = data["size"]
+        received = 0
+        total = data["size"]
 
 
         with open(save_path, "wb") as file:
@@ -470,7 +496,7 @@ class ChatWindow(QWidget):
             while remaining > 0:
 
                 chunk = self.client.recv(
-                    min(4096, remaining)
+                    min(65536, remaining)
                 )
 
 
@@ -481,6 +507,15 @@ class ChatWindow(QWidget):
                 file.write(chunk)
 
                 remaining -= len(chunk)
+                received += len(chunk)
+                percent = int((received / total) * 100)
+                self.message_received.emit(
+                    {
+                        "type": "download_progress",
+                        "file_id": data["file_id"],
+                        "progress": percent
+                    }
+                )
         
         self.receiving_file = False
         self.downloaded_files[data["file_id"]] = save_path
@@ -517,10 +552,10 @@ class ChatWindow(QWidget):
         send_json(self.client, header)
         with open(file_info["path"], "rb") as file:
             while True:
-                chunk = file.read(4096)
+                chunk = file.read(65536)
                 if not chunk:
                     break
-                self.client.send(chunk)
+                self.client.sendall(chunk)
         
 
 
@@ -591,12 +626,17 @@ class ChatWindow(QWidget):
         elif data["type"] == "download_complete":
 
             file_id = data["file_id"]
+            bar = self.file_progress[file_id]
+            bar.hide()
 
             button = self.file_buttons[file_id]
+            button.show()
 
             button.setText("Open")
-
-            button.clicked.disconnect()
+            try:
+                button.clicked.disconnect()
+            except:
+                pass
 
             button.clicked.connect(
                 lambda: os.startfile(
@@ -619,6 +659,24 @@ class ChatWindow(QWidget):
                     if button.text() == "Download":
                         button.setText("Sender offline")
                         button.setEnabled(False)
+        elif data["type"] == "download_progress":
+
+            bar = self.file_progress[
+                data["file_id"]
+            ]
+
+            button = self.file_buttons[
+                data["file_id"]
+            ]
+
+
+            button.hide()
+
+            bar.show()
+
+            bar.setValue(
+                data["progress"]
+            )
 
                         
             
