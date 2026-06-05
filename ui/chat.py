@@ -275,9 +275,13 @@ class ChatWindow(QWidget):
             title = f"📄 {data['filename']}"
 
         filename = QLabel(title)
+
+        size = QLabel(self.format_size(data["size"]))
+
         sender = QLabel(f"From {data['sender']}")
 
         layout.addWidget(filename)
+        layout.addWidget(size)
         layout.addWidget(sender)
 
 
@@ -528,6 +532,7 @@ class ChatWindow(QWidget):
         
 
 
+
     def request_file(self, data):
         request ={
             "type": "file_request",
@@ -558,6 +563,21 @@ class ChatWindow(QWidget):
                 self.client.sendall(chunk)
         
 
+    def format_size(self, size):
+
+        if size < 1024 ** 2:
+
+            return f"{size / 1024:.1f} KB"
+
+
+        elif size < 1024 ** 3:
+
+            return f"{size / (1024 ** 2):.1f} MB"
+
+
+        else:
+
+            return f"{size / (1024 ** 3):.2f} GB"
 
     def display_message(self, data):
 
@@ -718,6 +738,7 @@ class ChatWindow(QWidget):
             {
                 "filename": filename,
                 "sender": "You",
+                "size": file_size,
                 "private": receiver is not None
             },
             own=True,
