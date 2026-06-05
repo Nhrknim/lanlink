@@ -2,6 +2,8 @@ import sys
 import socket
 import threading
 import os
+import uuid
+import time
 from datetime import datetime
 from network.protocol import send_json, receive_json
 from network.server import stop_server
@@ -16,7 +18,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QListWidget,
     QLabel,
-    QFileDialog
+    QFileDialog,
+    QMessageBox
 )
 
 
@@ -26,12 +29,18 @@ class ChatWindow(QWidget):
 
     def __init__(self, username, server_ip):
         super().__init__()
-
+        self.running = True
+        self.valid = True
         self.username = username
         self.server_ip = server_ip
         self.buffer = ""
         self.selected_user = None
+        self.pending_files = {}
         self.is_host = False
+        self.receiving_file = False
+        self.file_buttons = {}
+        self.downloaded_files = {}
+        self.file_cards = {}
 
         self.setWindowTitle(f"LANLink - {self.username}")
         self.resize(800, 600)
@@ -143,6 +152,19 @@ class ChatWindow(QWidget):
                     "username": self.username
                 }
             )
+
+            response, self.buffer = receive_json(self.client,self.buffer)
+
+            if response["type"] == "login_failed":
+                QMessageBox.warning(
+                    self,
+                    "Login failed",
+                    response["message"]
+                )
+                self.valid = False
+                self.client.close()
+                return
+
             self.add_system_message(f"Connected as {self.username}")
 
             threading.Thread(
@@ -157,9 +179,27 @@ class ChatWindow(QWidget):
 
     def closeEvent(self, event):
 
+        self.running = False
+
+
+        self.pending_files.clear()
+        self.file_buttons.clear()
+        self.downloaded_files.clear()
+
+
         if self.is_host:
 
             stop_server()
+
+
+        try:
+
+            self.client.close()
+
+        except:
+
+            pass
+
 
         event.accept()
 
@@ -219,7 +259,86 @@ class ChatWindow(QWidget):
         self.chat_box.setItemWidget(item, row)
 
         self.chat_box.scrollToBottom()
+    
 
+    def add_file_card(self, data, own=False, path=None):
+
+        item = QListWidgetItem()
+        card = QWidget()
+        layout = QVBoxLayout()
+
+        if data.get("private"):
+            title = f"🔒 📄 {data['filename']}"
+        else:
+            title = f"📄 {data['filename']}"
+
+        filename = QLabel(title)
+        sender = QLabel(f"From {data['sender']}")
+
+        layout.addWidget(filename)
+        layout.addWidget(sender)
+
+
+        if own:
+
+            open_button = QPushButton("Open")
+
+            open_button.clicked.connect(
+                lambda: os.startfile(path)
+            )
+
+            layout.addWidget(open_button)
+
+
+        else:
+
+            download_button = QPushButton("Download")
+
+            download_button.clicked.connect(
+                lambda: self.request_file(data)
+            )
+            
+            self.file_buttons[data["file_id"]] = download_button
+            layout.addWidget(download_button)
+            sender = data["sender"]
+            if sender not in self.file_cards:
+                self.file_cards[sender] = []
+            self.file_cards[sender].append(download_button)
+
+
+        card.setLayout(layout)
+
+        card.setStyleSheet(
+            """
+            QWidget {
+                background-color: #333333;
+                border-radius: 10px;
+                padding: 8px;
+            }
+            """
+        )
+
+
+        container = QWidget()
+        container_layout = QHBoxLayout()
+        if own:
+
+            container_layout.addStretch()
+            container_layout.addWidget(card)
+
+        else:
+
+            container_layout.addWidget(card)
+            container_layout.addStretch()
+
+        container.setLayout(container_layout)
+        item.setSizeHint(container.sizeHint())
+        self.chat_box.addItem(item)
+        self.chat_box.setItemWidget(item, container)
+        self.chat_box.scrollToBottom()
+        
+
+        
     def add_system_message(self, message):
 
         item = QListWidgetItem()
@@ -250,7 +369,7 @@ class ChatWindow(QWidget):
             return
 
         try:
-            if self.selected_user:
+            if self.selected_user != "🌐 General":
 
                 data = {
                     "type": "private",
@@ -285,81 +404,125 @@ class ChatWindow(QWidget):
 
     def receive_messages(self):
 
-        while True:
+        while self.running:
 
             try:
 
+                if self.receiving_file:
+                    time.sleep(0.1)
+                    continue
+
                 data, self.buffer = receive_json(self.client, self.buffer)
 
+
                 if data is None:
+
+                    self.message_received.emit(
+                        {
+                            "type": "shutdown",
+                            "message": "Room closed"
+                        }
+                    )
+
                     break
+                
+                if data["type"] == "file_data":
+                    self.receiving_file = True
 
-                if data["type"] == "file":
+                self.message_received.emit(data)
+                    
 
-                    self.receive_file(data)
-
-                else:
-
-                    self.message_received.emit(data)
 
             except Exception as e:
 
                 print(e)
+
+
+                self.message_received.emit(
+                    {
+                        "type": "shutdown",
+                        "message": "Connection lost"
+                    }
+                )
+
                 break
 
     def receive_file(self, data):
 
-        filename = data["filename"]
-        file_size = data["size"]
+        self.receiving_file = True
 
-        os.makedirs(
-            "downloads",
-            exist_ok=True
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save File",
+            data["filename"]
         )
 
-        path = os.path.join(
-            "downloads",
-            filename
-        )
 
-        received = 0
+        if not save_path:
+            return
 
-        with open(path, "wb") as file:
 
-            while received < file_size:
+        remaining = data["size"]
+
+
+        with open(save_path, "wb") as file:
+
+            while remaining > 0:
 
                 chunk = self.client.recv(
-                    min(
-                        4096,
-                        file_size - received
-                    )
+                    min(4096, remaining)
                 )
+
 
                 if not chunk:
                     break
 
+
                 file.write(chunk)
 
-                received += len(chunk)
-
-        if data["private"]:
-
-            message = (
-                f"🔒 Private file from {data['sender']}: {filename}"
-            )
-
-        else:
-
-            message = (
-                f"📁 File from {data['sender']}: {filename}"
-            )
-
+                remaining -= len(chunk)
+        
+        self.receiving_file = False
+        self.downloaded_files[data["file_id"]] = save_path
         self.message_received.emit(
             {
-                "type": "system",
-                "message": message
+                "type": "download_complete",
+                "file_id": data["file_id"]
             }
-        )
+        )        
+        
+
+
+    def request_file(self, data):
+        request ={
+            "type": "file_request",
+            "file_id": data["file_id"],
+            "from": data["sender"]
+        }
+        send_json(self.client, request)
+
+    def send_requested_file(self, data):
+        file_id = data["file_id"]
+        if file_id not in self.pending_files:
+            return
+        file_info = self.pending_files[file_id]
+        header={
+           "type": "file_data",
+           "file_id": file_id,
+           "filename": file_info["filename"],
+           "size": file_info["size"],
+           "to": data["receiver"]
+        }
+
+        send_json(self.client, header)
+        with open(file_info["path"], "rb") as file:
+            while True:
+                chunk = file.read(4096)
+                if not chunk:
+                    break
+                self.client.send(chunk)
+        
+
 
     def display_message(self, data):
 
@@ -378,6 +541,7 @@ class ChatWindow(QWidget):
             )
 
         elif data["type"] == "users":
+            current = self.selected_user
 
             self.user_list.clear()
 
@@ -387,6 +551,20 @@ class ChatWindow(QWidget):
                 if user == self.username:
                     continue
                 self.user_list.addItem(user)
+            
+            if current:
+                items = self.user_list.findItems(current,Qt.MatchFlag.MatchExactly)
+                if items:
+                    self.user_list.setCurrentItem(items[0])
+                else:
+                    self.user_list.setCurrentRow(0)
+                    self.selected_user = "🌐 General"
+            else:
+                self.user_list.setCurrentRow(0)
+                self.selected_user = "🌐 General"
+
+
+        
         elif data["type"] == "private":
             time = datetime.now().strftime("%I:%M %p")
 
@@ -399,46 +577,93 @@ class ChatWindow(QWidget):
             self.add_system_message(data["message"])
 
             QTimer.singleShot(2000, self.close)
+        
+        elif data["type"] == "file_offer":
+            self.add_file_card(data)
+        
+        elif data["type"] == "send_file":
+            self.send_requested_file(data)
+        
+        elif data["type"] == "file_data":
+            self.receive_file(data)
+
+    
+        elif data["type"] == "download_complete":
+
+            file_id = data["file_id"]
+
+            button = self.file_buttons[file_id]
+
+            button.setText("Open")
+
+            button.clicked.disconnect()
+
+            button.clicked.connect(
+                lambda: os.startfile(
+                    self.downloaded_files[file_id]
+                )
+            )
+        elif data["type"] == "user_left":
+
+            self.add_system_message(
+                data["message"]
+            )
+
+
+            user = data["username"]
+
+
+            if user in self.file_cards:
+
+                for button in self.file_cards[user]:
+                    if button.text() == "Download":
+                        button.setText("Sender offline")
+                        button.setEnabled(False)
+
+                        
+            
 
     def select_file(self):
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select File"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
 
         if not file_path:
             return
 
-        filename = file_path.split("/")[-1]
+        filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
 
+        file_id = str(uuid.uuid4())
+
+        self.pending_files[file_id]={
+            "path": file_path,
+            "filename": filename,
+            "size": file_size
+        }
+
+        receiver = None
+        if self.selected_user != "🌐 General":
+            receiver = self.selected_user
+
         file_data = {
-            "type": "file",
+            "type": "file_offer",
+            "file_id": file_id,
             "filename": filename,
             "size": file_size,
-            "to": self.selected_user
+            "to": receiver
         }
 
         # send file information
         send_json(self.client, file_data)
 
-        # send actual file bytes
-        with open(file_path, "rb") as file:
-
-            while True:
-
-                chunk = file.read(4096)
-
-                if not chunk:
-                    break
-
-                self.client.send(chunk)
-
-        self.add_message(
-            "You",
-            f"📤 Sent {filename}",
-            own=True
+        self.add_file_card(
+            {
+                "filename": filename,
+                "sender": "You",
+                "private": receiver is not None
+            },
+            own=True,
+            path=file_path
         )
 
     def select_user(self, item):

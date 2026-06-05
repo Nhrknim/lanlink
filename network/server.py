@@ -111,77 +111,59 @@ def handle_client(client):
                         )
 
                         break
-            elif data["type"] == "file":
-
-                # ---------- CREATE FILE HEADER ----------
-
-                file_message = {
-                    "type": "file",
+            elif data["type"] == "file_offer":
+                file_message ={
+                    "type": "file_offer",
                     "sender": username,
+                    "file_id": data["file_id"],
                     "filename": data["filename"],
                     "size": data["size"],
                     "private": bool(data.get("to"))
                 }
 
-                # ---------- FIND RECEIVERS ----------
-
-                receivers = []
-
-                # Private file transfer
-                if data.get("to"):
-
-                    for user_socket, user_name in clients.items():
-
-                        if user_name == data["to"]:
-
-                            receivers.append(user_socket)
+                if data["to"]:
+                    for other, user in clients.items():
+                        if user == data["to"]:
+                            send_json(other, file_message)
                             break
-
-                # Public file transfer
                 else:
+                    broadcast(file_message,client)
 
-                    for user_socket in list(clients.keys()):
+            elif data["type"] == "file_request":
+                request ={
+                    "type": "send_file",
+                    "file_id": data["file_id"],
+                    "receiver": username
+                }
 
-                        if user_socket != client:
-
-                            receivers.append(user_socket)
-
-                # ---------- SEND FILE HEADER ----------
-
-                for receiver in receivers:
-
-                    send_json(
-                        receiver,
-                        file_message
-                    )
-
-                # ---------- TRANSFER FILE DATA ----------
-
-                remaining = data["size"]
-
-                while remaining > 0:
-
-                    chunk = client.recv(
-                        min(
-                            4096,
-                            remaining
-                        )
-                    )
-
-                    if not chunk:
+                for other, user in clients.items():
+                    if user == data["from"]:
+                        send_json(other, request)
                         break
+            elif data["type"] == "file_data":
+                receiver = None
+                for user_socket, user_name in clients.items():
+                    if user_name == data["to"]:
+                        receiver = user_socket
+                        break
+                if receiver:
+                    file_header = {
+                        "type": "file_data",
+                        "file_id": data["file_id"],
+                        "sender": username,
+                        "filename": data["filename"],
+                        "size": data["size"]                        
+                    } 
+                    send_json(receiver, file_header)   
+                    remaining = data["size"]
+                    while remaining > 0:
+                        chunk = client.recv( min(4096, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        receiver.send(chunk)
+                    print(f"Sent {data['filename']} to {data['to']}")
 
-                    remaining -= len(chunk)
-
-                    for receiver in receivers:
-
-                        receiver.send(
-                            chunk
-                        )
-
-                print(
-                    f"File transfer completed: {data['filename']}"
-                )
 
         except Exception as e:
             print("Error:", e)
@@ -193,7 +175,8 @@ def handle_client(client):
         del clients[client]
 
     leave_message = {
-        "type": "system",
+        "type": "user_left",
+        "username": username,
         "message": f"{username} left the chat"
     }
 
@@ -235,6 +218,23 @@ def start_server():
                 )
 
                 username = login_data["username"]
+
+                if username in clients.values():
+                    send_json(
+                        client_socket,
+                        {
+                            "type": "login_failed",
+                            "message": "Username already taken"
+                        }
+                    )
+                    client_socket.close()
+                    continue
+                send_json(
+                    client_socket,
+                    {
+                        "type": "login_success"
+                    }
+                )
 
                 clients[client_socket] = username
 

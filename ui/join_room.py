@@ -87,8 +87,25 @@ class JoinRoomWindow(QWidget):
         ip = self.rooms[room_name]["ip"]
 
 
-        self.chat = ChatWindow(username, ip)
+        try:
 
-        self.chat.show()
+            self.chat = ChatWindow(
+                username,
+                ip
+            )
 
-        self.close()
+            if self.chat.valid:
+
+                self.chat.show()
+
+                self.close()
+            else:
+                self.username_input.clear()
+                self.username_input.setFocus()
+
+
+        except Exception as e:
+
+            if str(e) == "LOGIN_FAILED":
+
+                self.show()
